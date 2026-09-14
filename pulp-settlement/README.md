@@ -27,7 +27,10 @@ python3 run.py            # 默认 http://127.0.0.1:8050
 ## 测试
 
 ```bash
-python3 -m unittest discover -s tests -v   # 或 bash bin/test.sh
+bash bin/test.sh           # 全部：Python 套件 + 浏览器回归
+# 或分别执行：
+python3 -m unittest discover -s tests -v
+npm install && node tests/browser_regression.mjs
 ```
 
 - `tests/test_services.py`：15 项服务层用例（计价、档位边界、双人复核、
@@ -35,6 +38,12 @@ python3 -m unittest discover -s tests -v   # 或 bash bin/test.sh
 - `tests/test_http_e2e.py`：7 项真实 HTTP 用例——启动**真实服务子进程**，
   经网络走完 录入→计价→复核→付款→冲正，含**两线程并发付款**（恰好一成一败、
   无超扣无半笔）与**杀进程重启后状态恢复并继续业务**。
+- `tests/browser_regression.mjs`：jsdom **真实执行 `static/app.js`** 的浏览器回归
+  （需 `npm install`，零外部服务）：加载真实页面并断言控制台无错误，
+  通过真实点击/填表驱动 登录（切换 4 名操作人）→ 网页校验拦截 → 录入回显
+  → 计价 → 制单人禁审/同人禁二审/双人复核 → FIFO 付款 → 红冲余额恢复，
+  最后**杀服务重启再开页面**，确认登录下拉、总览、余额、已冲正状态与两审记录
+  全部完整且控制台仍无错误。
 
 ## 业务规则
 

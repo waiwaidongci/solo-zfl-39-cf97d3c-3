@@ -3,3 +3,4 @@ data/*.db-wal
 data/*.db-shm
 __pycache__/
 *.pyc
+node_modules/

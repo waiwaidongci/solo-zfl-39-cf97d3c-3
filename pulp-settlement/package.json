@@ -1,0 +1,12 @@
+{
+  "name": "pulp-settlement-browser-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "jsdom 浏览器回归（真实执行 static/app.js）",
+  "scripts": {
+    "test:browser": "node tests/browser_regression.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^24"
+  }
+}

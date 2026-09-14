@@ -116,7 +116,7 @@ $$("#tabs button").forEach(btn => {
 
 // --------------------------------------------------------------- 数据加载
 async function loadAll() {
-  const [users, suppliers, contracts, tiers, prepays, receipts, settlements] =
+  const [users, suppliers, contracts, tiers, prepayments, receipts, settlements] =
     await Promise.all([
       api("/api/users"), api("/api/suppliers"), api("/api/contracts"),
       api("/api/tiers"), api("/api/prepayments"),
@@ -202,7 +202,7 @@ $("#supplierForm").onsubmit = async e => {
 $("#contractForm").onsubmit = async e => {
   e.preventDefault();
   const f = e.target;
-  const price = f.price_yuan.value;
+  const price = f.elements.price_yuan.value;
   if (!decimalOk(price, { positive: true, maxDp: 2 }))
     return toast("单价必须是正数且最多两位小数", true);
   try {
@@ -224,15 +224,15 @@ function renderPrepay() {
 $("#prepayForm").onsubmit = async e => {
   e.preventDefault();
   const f = e.target;
-  const amount = f.amount_yuan.value;
+  const amount = f.elements.amount_yuan.value;
   if (!decimalOk(amount, { positive: true, maxDp: 2 }))
     return toast("金额必须是正数且最多两位小数", true);
-  if (!f.received_at.value) return toast("请选择到账时间", true);
+  if (!f.elements.received_at.value) return toast("请选择到账时间", true);
   const body = Object.fromEntries(new FormData(f));
   body.received_at = body.received_at.replace("T", " ") + ":00";
   try {
     await api("/api/prepayments", { method: "POST", body: JSON.stringify(body) });
-    f.reset(); f.received_at.value = nowLocalInput();
+    f.reset(); f.elements.received_at.value = nowLocalInput();
     toast("预付款已登记"); await reload("prepayments");
   } catch (err) { toast(err.message, true); }
 };
@@ -246,14 +246,14 @@ function pickTier(measure, value) {
 }
 function previewReceipt() {
   const f = $("#receiptForm");
-  const gross = f.gross_kg.value, tare = f.tare_kg.value;
-  const water = f.water_pct.value, impurity = f.impurity_pct.value;
+  const gross = f.elements.gross_kg.value, tare = f.elements.tare_kg.value;
+  const water = f.elements.water_pct.value, impurity = f.elements.impurity_pct.value;
   const errs = [];
   const checks = [
-    [f.gross_kg, decimalOk(gross, { positive: true }), "毛重须为正数（≤3位小数）"],
-    [f.tare_kg, decimalOk(tare, { min: 0, maxDp: 3 }), "皮重须为非负数"],
-    [f.water_pct, decimalOk(water, { min: 0, max: 100, maxDp: 2 }), "含水须在 0~100"],
-    [f.impurity_pct, decimalOk(impurity, { min: 0, max: 100, maxDp: 2 }), "杂质须在 0~100"],
+    [f.elements.gross_kg, decimalOk(gross, { positive: true }), "毛重须为正数（≤3位小数）"],
+    [f.elements.tare_kg, decimalOk(tare, { min: 0, maxDp: 3 }), "皮重须为非负数"],
+    [f.elements.water_pct, decimalOk(water, { min: 0, max: 100, maxDp: 2 }), "含水须在 0~100"],
+    [f.elements.impurity_pct, decimalOk(impurity, { min: 0, max: 100, maxDp: 2 }), "杂质须在 0~100"],
   ];
   checks.forEach(([input, ok, msg]) => { markInvalid(input, !ok); if (!ok) errs.push(msg); });
   if (Number(tare) >= Number(gross)) errs.push("皮重必须小于毛重");
@@ -265,9 +265,9 @@ function previewReceipt() {
   const pct = Number(wt.deduction_pct) + Number(it.deduction_pct);
   const deducted = net * pct / 100;
   const settled = net - deducted;
-  const supplierId = Number(f.supplier_id.value);
-  const grade = f.grade.value;
-  const wd = f.weigh_date.value;
+  const supplierId = Number(f.elements.supplier_id.value);
+  const grade = f.elements.grade.value;
+  const wd = f.elements.weigh_date.value;
   const c = state.contracts
     .filter(x => x.supplier_id === supplierId && x.grade === grade && x.effective_date <= wd)
     .sort((a, b) => (a.effective_date < b.effective_date ? 1 : -1))[0];
@@ -303,12 +303,12 @@ $("#receiptPreview").onclick = previewReceipt;
 $("#receiptForm").onsubmit = async e => {
   e.preventDefault();
   const f = e.target;
-  const ok = decimalOk(f.gross_kg.value, { positive: true })
-    && decimalOk(f.tare_kg.value, { min: 0, maxDp: 3 })
-    && Number(f.tare_kg.value) < Number(f.gross_kg.value)
-    && decimalOk(f.water_pct.value, { min: 0, max: 100, maxDp: 2 })
-    && decimalOk(f.impurity_pct.value, { min: 0, max: 100, maxDp: 2 })
-    && f.weigh_date.value && f.weigh_date.value <= todayISO();
+  const ok = decimalOk(f.elements.gross_kg.value, { positive: true })
+    && decimalOk(f.elements.tare_kg.value, { min: 0, maxDp: 3 })
+    && Number(f.elements.tare_kg.value) < Number(f.elements.gross_kg.value)
+    && decimalOk(f.elements.water_pct.value, { min: 0, max: 100, maxDp: 2 })
+    && decimalOk(f.elements.impurity_pct.value, { min: 0, max: 100, maxDp: 2 })
+    && f.elements.weigh_date.value && f.elements.weigh_date.value <= todayISO();
   if (!ok) { previewReceipt(); return toast("请检查录入项（皮重须小于毛重、日期不可晚于今天）", true); }
   try {
     await api("/api/receipts", { method: "POST",
@@ -321,7 +321,7 @@ $("#receiptForm").onsubmit = async e => {
 };
 function setReceiptDefaults() {
   const f = $("#receiptForm");
-  f.weigh_date.value = todayISO();
+  f.elements.weigh_date.value = todayISO();
 }
 
 // --------------------------------------------------------------- 结算 / 复核 / 付款 / 冲正
@@ -441,7 +441,7 @@ async function renderAll() {
 async function init() {
   setReceiptDefaults();
   const pf = $("#prepayForm");
-  pf.received_at.value = nowLocalInput();
+  pf.elements.received_at.value = nowLocalInput();
   await refreshMe();
   await loadAll();
   fillSupplierSelects();
