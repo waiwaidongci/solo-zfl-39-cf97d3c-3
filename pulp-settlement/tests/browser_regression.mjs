@@ -3,13 +3,16 @@
 //       → 冲正 → 服务重启后页面与状态恢复。
 // 运行：node tests/browser_regression.mjs
 import { JSDOM, VirtualConsole } from "jsdom";
+import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+// 必须用 fileURLToPath 解码真实路径：new URL(...).pathname 会把空格编成 %20、
+// 中文编成 %E4%B8%AD…，在含空格/中文的项目路径下 spawn 会因 cwd 不存在报 ENOENT。
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = Number(process.env.PULP_BROWSER_PORT || 18099);
 const BASE = `http://127.0.0.1:${PORT}`;
 const dbPath = path.join(os.tmpdir(), `pulp-browser-${process.pid}.db`);
@@ -67,9 +70,14 @@ function killAllServers() {
   }
   liveServers.clear();
 }
-process.on("exit", killAllServers);
-process.on("SIGTERM", () => { killAllServers(); process.exit(143); });
-process.on("SIGINT", () => { killAllServers(); process.exit(130); });
+function removeTempDb() {
+  for (const ext of ["", "-wal", "-shm"]) {
+    try { fs.rmSync(dbPath + ext); } catch {}
+  }
+}
+process.on("exit", () => { killAllServers(); removeTempDb(); });
+process.on("SIGTERM", () => { killAllServers(); removeTempDb(); process.exit(143); });
+process.on("SIGINT", () => { killAllServers(); removeTempDb(); process.exit(130); });
 function stopServer(proc) {
   return new Promise(resolve => {
     if (proc.exitCode !== null) return resolve();
