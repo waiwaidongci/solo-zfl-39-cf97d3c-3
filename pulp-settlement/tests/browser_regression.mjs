@@ -141,8 +141,17 @@ async function openPage() {
     d.querySelector("#logoutBtn").click();
     await waitFor(() => d.querySelector("#loginUser"), { label: "退出登录" });
   };
+  // 总览卡片由独立的 /api/summary 请求驱动，晚于其它首屏数据落盘；
+  // 必须按内容条件轮询，不能假设下拉渲染完卡片就已渲染。
+  const waitDash = async receiptCount => {
+    const expected = String(receiptCount);
+    return waitFor(() => {
+      const vals = [...d.querySelectorAll("#dashCards .card-stat .v")].map(e => e.textContent);
+      return vals.length === 5 && vals[0] === expected ? vals : null;
+    }, { label: `总览卡片渲染（车次数=${receiptCount}）` });
+  };
   return { dom, window: w, document: d, consoleErrors, clickTab, setVal,
-           fillForm, login, logout };
+           fillForm, login, logout, waitDash };
 }
 
 function isoDate(deltaDays) {
@@ -172,8 +181,8 @@ async function run() {
   check(d.querySelectorAll("#supplierTable tr").length >= 3, "供应商表格已渲染（含表头）");
   check(d.querySelectorAll("#contractTable tr").length >= 2, "合同分段价已渲染");
   page.clickTab("dash");
-  const statVals = [...d.querySelectorAll("#dashCards .card-stat .v")].map(e => e.textContent);
-  check(statVals[0] === "0" && statVals.includes("105000.00"),
+  const statVals = await page.waitDash(0);
+  check(statVals.includes("105000.00"),
     "总览卡片已渲染（车次数 0、预付总余额 105000.00 元），实际: " + statVals.join("|"));
   check(d.querySelector("#toast").classList.contains("hidden"), "没有弹出初始化失败提示");
 
@@ -188,10 +197,9 @@ async function run() {
   });
   d.querySelector("#receiptForm").dispatchEvent(new page.window.Event("submit",
     { bubbles: true, cancelable: true }));
-  await new Promise(r => setTimeout(r, 300));
-  check(!d.querySelector("#toast").classList.contains("hidden")
-    && d.querySelector("#toast").classList.contains("error"),
-    "皮重大于毛重时网页拦截并提示错误");
+  await waitFor(() => d.querySelector("#toast.error:not(.hidden)"),
+    { label: "前端拦截错误提示出现" });
+  check(true, "皮重大于毛重时网页拦截并提示错误");
   check(d.querySelectorAll("#receiptTable tr").length === 1, "非法录入没有产生任何记录");
 
   // ============ 3. 录入（净重/扣量由后端计算并回显） ============
@@ -314,7 +322,8 @@ async function run() {
   check(d2.querySelectorAll("#loginUser option").length === 5, "重启后登录人员下拉正常");
   await page.login("u2");
   check(d2.querySelector("#loginBox").textContent.includes("李四"), "重启后可正常登录");
-  const vals2 = [...d2.querySelectorAll("#dashCards .card-stat .v")].map(e => e.textContent);
+  // 登录会触发 renderAll()，总览卡片由独立的 summary 请求重绘，同样条件等待
+  const vals2 = await page.waitDash(1);
   check(vals2[0] === "1", "重启后总览车次仍为 1");
   page.clickTab("prepay");
   const preRow2 = code => [...d2.querySelectorAll("#prepayTable tr")]
