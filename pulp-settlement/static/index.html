@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>纸浆原料验收入库与结算系统</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>纸浆原料验收入库与结算</h1>
+    <div class="sub">验收入库 · 按档扣量 · 分段计价 · 双人复核 · 预付抵扣 · 红冲留痕</div>
+  </div>
+  <div id="loginBox" class="login-box"></div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="dash" class="active">总览</button>
+  <button data-tab="masters">供应商 / 合同 / 扣量档</button>
+  <button data-tab="prepay">预付款登记</button>
+  <button data-tab="receive">验收入库</button>
+  <button data-tab="settle">结算 · 复核 · 付款 · 冲正</button>
+</nav>
+
+<main>
+  <!-- 总览 -->
+  <section id="tab-dash" class="tab active">
+    <div class="cards" id="dashCards"></div>
+    <div class="panel">
+      <h2>业务规则</h2>
+      <ul class="rules">
+        <li>每车登记毛重、皮重、含水、杂质、等级：净重 = 毛重 − 皮重。</li>
+        <li>含水、杂质分别按档扣减净重，两档扣点相加得到扣量，结算重量 = 净重 − 扣量。</li>
+        <li>结算价取该供应商、该等级<b>过磅日当天（含）之前已生效</b>的最新合同段；未来价格不能提前使用。</li>
+        <li>结算金额超过 <b>50,000.00 元</b> 须两名不同人员复核（且不得是制单人本人）；未超限免复核。</li>
+        <li>付款按预付款到账先后 FIFO 抵扣；余额不足<b>整单失败</b>，不产生任何半截抵扣。</li>
+        <li>付款后只能冲正（红冲并恢复预付款余额），付款与结算记录不可改写、不可删除。</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 主数据 -->
+  <section id="tab-masters" class="tab">
+    <div class="grid2">
+      <div class="panel">
+        <h2>供应商</h2>
+        <form id="supplierForm" class="form">
+          <label>编码 <input name="code" required maxlength="20" placeholder="S003"></label>
+          <label>名称 <input name="name" required maxlength="50" placeholder="供应商名称"></label>
+          <button type="submit">新增供应商</button>
+        </form>
+        <table id="supplierTable"></table>
+      </div>
+      <div class="panel">
+        <h2>合同分段价（元/千克）</h2>
+        <form id="contractForm" class="form">
+          <label>供应商
+            <select name="supplier_id" required></select>
+          </label>
+          <label>等级
+            <select name="grade"><option>A</option><option>B</option><option>C</option></select>
+          </label>
+          <label>单价（元/kg）
+            <input name="price_yuan" required inputmode="decimal" placeholder="5.60">
+          </label>
+          <label>生效日期
+            <input name="effective_date" type="date" required>
+          </label>
+          <label class="full">备注 <input name="note" maxlength="100"></label>
+          <button type="submit">登记合同段</button>
+        </form>
+        <p class="hint">同一天之后可再登记新段；计价时自动取过磅日最新的已生效段。</p>
+        <table id="contractTable"></table>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>按档扣量规则</h2>
+      <div class="grid2">
+        <div><h3>含水档</h3><table id="waterTierTable"></table></div>
+        <div><h3>杂质档</h3><table id="impurityTierTable"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 预付款 -->
+  <section id="tab-prepay" class="tab">
+    <div class="panel narrow">
+      <h2>预付款到账登记</h2>
+      <form id="prepayForm" class="form">
+        <label>单号（留空自动生成）<input name="code" maxlength="20"></label>
+        <label>供应商 <select name="supplier_id" required></select></label>
+        <label>金额（元）<input name="amount_yuan" required inputmode="decimal" placeholder="30000.00"></label>
+        <label>到账时间 <input name="received_at" type="datetime-local" step="1" required></label>
+        <label class="full">备注 <input name="note" maxlength="100"></label>
+        <button type="submit">登记预付款</button>
+      </form>
+      <p class="hint">抵扣顺序严格按到账时间先到先抵；同一时刻按登记号次序。</p>
+      <table id="prepayTable"></table>
+    </div>
+  </section>
+
+  <!-- 验收入库 -->
+  <section id="tab-receive" class="tab">
+    <div class="grid2">
+      <div class="panel">
+        <h2>来车验收入库</h2>
+        <form id="receiptForm" class="form">
+          <label>车号/单号（留空自动生成）<input name="code" maxlength="20"></label>
+          <label>供应商 <select name="supplier_id" required></select></label>
+          <label>过磅日期 <input name="weigh_date" type="date" required></label>
+          <label>等级 <select name="grade"><option>A</option><option>B</option><option>C</option></select></label>
+          <label>毛重（kg）<input name="gross_kg" required inputmode="decimal" placeholder="26000.000"></label>
+          <label>皮重（kg）<input name="tare_kg" required inputmode="decimal" placeholder="9000.000"></label>
+          <label>含水（%）<input name="water_pct" required inputmode="decimal" placeholder="13.5"></label>
+          <label>杂质（%）<input name="impurity_pct" required inputmode="decimal" placeholder="2.2"></label>
+          <button type="submit">计算净重并登记</button>
+          <button type="button" id="receiptPreview" class="secondary">仅试算</button>
+        </form>
+        <div id="receiptPreviewBox" class="preview hidden"></div>
+      </div>
+      <div class="panel">
+        <h2>验收记录</h2>
+        <table id="receiptTable"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- 结算 -->
+  <section id="tab-settle" class="tab">
+    <div class="panel">
+      <h2>结算单</h2>
+      <div class="toolbar">
+        <select id="settleFilter">
+          <option value="">全部状态</option>
+          <option value="pending_review">待复核</option>
+          <option value="approved">待付款</option>
+          <option value="paid">已付款</option>
+          <option value="reversed">已冲正</option>
+        </select>
+        <button id="settleRefresh" class="secondary">刷新</button>
+      </div>
+      <div id="settleList"></div>
+    </div>
+  </section>
+</main>
+
+<div id="toast" class="toast hidden"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
